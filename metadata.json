@@ -1,0 +1,7 @@
+{
+  "name": "VogueVault",
+  "description": "An AI-powered digital wardrobe manager and personal stylist featuring a cyber-luxury aesthetic and sustainability tracking.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
