@@ -42,6 +42,8 @@ export enum AppView {
   VAULT = 'vault',
   ORCHESTRATOR = 'orchestrator',
   GATEKEEPER = 'gatekeeper',
+  MIXER = 'mixer',
+  DESIGN_STUDIO = 'design_studio',
   IMPACT = 'impact',
   SETTINGS = 'settings'
 }

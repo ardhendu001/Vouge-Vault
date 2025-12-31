@@ -74,7 +74,7 @@ const Wardrobe: React.FC<WardrobeProps> = ({ items, onSelectItem, onOpenUpload, 
           </button>
       </div>
 
-      <div className="glass-panel p-4 rounded-xl flex flex-col md:flex-row gap-4 items-center justify-between sticky top-0 z-30 backdrop-blur-xl bg-[#0B0014]/80">
+      <div className="glass-panel p-4 rounded-xl flex flex-col md:flex-row gap-4 items-center justify-between sticky top-0 z-30 backdrop-blur-xl bg-[#0B0014]/80 border-white/5">
         <div className="flex items-center gap-2 overflow-x-auto no-scrollbar w-full md:w-auto py-1 flex-1">
            <Filter className="w-5 h-5 text-gray-400 mr-2 flex-shrink-0" />
            {categories.map(cat => (
@@ -92,41 +92,59 @@ const Wardrobe: React.FC<WardrobeProps> = ({ items, onSelectItem, onOpenUpload, 
            ))}
         </div>
 
-        <div className="flex items-center gap-2 relative">
-          <button 
-            onClick={() => setIsSortOpen(!isSortOpen)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-medium transition-colors min-w-[160px] justify-between"
-          >
-            <div className="flex items-center gap-2">
-              <ArrowUpDown className="w-4 h-4 text-fuchsia-400" />
-              <span className="text-gray-400">Sort:</span>
-              <span className="text-white">{getSortLabel(sortOption)}</span>
-            </div>
-            <ChevronDown className="w-4 h-4 text-gray-500" />
-          </button>
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          {/* Search Bar Integration */}
+          <div className="flex items-center gap-2 bg-black/40 border border-white/10 rounded-full px-4 py-2 w-full md:w-64 focus-within:border-fuchsia-500/50 transition-all shadow-inner">
+            <Search className="w-4 h-4 text-gray-500" />
+            <input 
+              type="text"
+              placeholder="Search vault..."
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="bg-transparent border-none outline-none text-sm text-white placeholder-gray-600 w-full"
+            />
+            {search && (
+              <button onClick={() => setSearch('')} className="p-0.5 hover:bg-white/10 rounded-full">
+                <X className="w-3 h-3 text-gray-500" />
+              </button>
+            )}
+          </div>
 
-          {isSortOpen && (
-            <>
-              <div className="fixed inset-0 z-40" onClick={() => setIsSortOpen(false)} />
-              <div className="absolute right-0 top-full mt-2 w-full min-w-[160px] bg-[#0F0518] glass-panel border border-white/20 rounded-xl shadow-2xl overflow-hidden z-50 animate-fade-in-down">
-                {[
-                  { id: 'wear-desc', label: 'Most Worn (High-Low)' },
-                  { id: 'wear-asc', label: 'Least Worn (Low-High)' },
-                  { id: 'newest', label: 'Newest Added' }
-                ].map((opt) => (
-                  <button
-                    key={opt.id}
-                    onClick={() => { setSortOption(opt.id as SortOption); setIsSortOpen(false); }}
-                    className={`w-full text-left px-4 py-3 text-sm hover:bg-white/10 transition-colors ${
-                      sortOption === opt.id ? 'text-fuchsia-400 font-bold bg-white/5' : 'text-gray-300'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
+          <div className="flex items-center gap-2 relative flex-shrink-0">
+            <button 
+              onClick={() => setIsSortOpen(!isSortOpen)}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-medium transition-colors min-w-[140px] justify-between"
+            >
+              <div className="flex items-center gap-2">
+                <ArrowUpDown className="w-4 h-4 text-fuchsia-400" />
+                <span className="text-white hidden sm:inline">{getSortLabel(sortOption)}</span>
               </div>
-            </>
-          )}
+              <ChevronDown className="w-4 h-4 text-gray-500" />
+            </button>
+
+            {isSortOpen && (
+              <>
+                <div className="fixed inset-0 z-40" onClick={() => setIsSortOpen(false)} />
+                <div className="absolute right-0 top-full mt-2 w-full min-w-[160px] bg-[#0F0518] glass-panel border border-white/20 rounded-xl shadow-2xl overflow-hidden z-50 animate-fade-in-down">
+                  {[
+                    { id: 'wear-desc', label: 'Most Worn' },
+                    { id: 'wear-asc', label: 'Least Worn' },
+                    { id: 'newest', label: 'Newest Added' }
+                  ].map((opt) => (
+                    <button
+                      key={opt.id}
+                      onClick={() => { setSortOption(opt.id as SortOption); setIsSortOpen(false); }}
+                      className={`w-full text-left px-4 py-3 text-sm hover:bg-white/10 transition-colors ${
+                        sortOption === opt.id ? 'text-fuchsia-400 font-bold bg-white/5' : 'text-gray-300'
+                      }`}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -141,7 +159,7 @@ const Wardrobe: React.FC<WardrobeProps> = ({ items, onSelectItem, onOpenUpload, 
             <div className="absolute inset-0 bg-gradient-to-t from-black via-transparent to-transparent opacity-80" />
             
             <div className="absolute bottom-0 left-0 right-0 p-4">
-              <h3 className="font-bold text-white mb-1">{item.title}</h3>
+              <h3 className="font-bold text-white mb-1 truncate">{item.title}</h3>
               <p className="text-xs text-gray-400 flex flex-wrap gap-2 items-center">
                 <span className={`${sortOption.includes('wear') ? 'text-fuchsia-300 font-bold' : ''}`}>{item.wearCount} Wears</span>
                 <span>•</span>

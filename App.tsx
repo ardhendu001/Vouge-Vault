@@ -8,6 +8,8 @@ import UploadModal from './components/UploadModal';
 import SustainabilityModal from './components/SustainabilityModal';
 import SustainabilityView from './components/SustainabilityView';
 import Gatekeeper from './components/Gatekeeper';
+import FashionMixer from './components/FashionMixer';
+import DesignStudio from './components/DesignStudio';
 import { AppView, WardrobeItem } from './types';
 import { INITIAL_WARDROBE, MOCK_WEATHER } from './constants';
 
@@ -84,6 +86,10 @@ const App: React.FC = () => {
             onAvoidPurchase={handleAvoidPurchase}
           />
         );
+      case AppView.MIXER:
+        return <FashionMixer onSaveToVault={handleAddItem} />;
+      case AppView.DESIGN_STUDIO:
+        return <DesignStudio onSaveToVault={handleAddItem} />;
       case AppView.IMPACT:
         return <SustainabilityView wardrobe={wardrobe} onGoToWardrobe={() => setCurrentView(AppView.VAULT)} />;
       case AppView.SETTINGS:
@@ -127,7 +133,6 @@ const App: React.FC = () => {
       />
       
       {/* Main Content Area */}
-      {/* Added pt-20 for mobile header spacing, md:pt-8 for desktop */}
       <main className="md:ml-64 p-4 md:p-8 pt-24 md:pt-8 min-h-screen transition-all duration-300">
         {renderContent()}
       </main>

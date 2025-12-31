@@ -2,9 +2,6 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { WardrobeItem, GatekeeperVerdict } from '../types';
 
-const apiKey = process.env.API_KEY || '';
-const ai = new GoogleGenAI({ apiKey });
-
 export const fileToGenerativePart = async (file: File): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -18,24 +15,97 @@ export const fileToGenerativePart = async (file: File): Promise<string> => {
   });
 };
 
-// -- THE GATEKEEPER LOGIC --
+// -- FASHION MIXER (Style DNA Blending) --
+export const mixFashionStyles = async (
+  images: { data: string, mimeType: string }[]
+): Promise<{ text: string, image: string | null }> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+  
+  const prompt = `Act as a master fashion designer and creative director. 
+  Task: Mix the style DNA of the provided images into ONE NEW cohesive high-fashion outfit or garment.
+  Aesthetics to blend: ${images.length} distinct source references.
+  Focus on: Innovative silhouettes, material contrast, and sustainable futuristic luxury.
+  Provide:
+  1. A photorealistic generation of the new mixed design.
+  2. A designer's note explaining the blend.`;
+
+  try {
+    const parts = images.map(img => ({
+      inlineData: { data: img.data, mimeType: img.mimeType }
+    }));
+    parts.push({ text: prompt } as any);
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash-image",
+      contents: { parts },
+      config: { imageConfig: { aspectRatio: "3:4" } }
+    });
+
+    let text = "";
+    let image = null;
+
+    if (response.candidates?.[0]?.content?.parts) {
+      for (const part of response.candidates[0].content.parts) {
+        if (part.text) text += part.text;
+        if (part.inlineData) image = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+      }
+    }
+    return { text, image };
+  } catch (e) {
+    console.error(e);
+    return { text: "Blending failed. Ensure images are high quality.", image: null };
+  }
+};
+
+// -- ADVANCED DESIGN LAB (Gemini 3 Pro) --
+export const generateProDesign = async (
+  prompt: string,
+  aspectRatio: "1:1" | "3:4" | "4:3" | "16:9" | "9:16" = "1:1",
+  referenceImage?: { data: string, mimeType: string }
+): Promise<{ text: string, image: string | null }> => {
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+  
+  const basePrompt = `HIGH-FASHION DESIGN STUDIO.
+  Subject: ${prompt}
+  Style: Photorealistic luxury editorial, studio lighting, 8k resolution, haute couture.
+  ${referenceImage ? "Heavily reference the aesthetic, color palette, and textures from the provided reference asset." : ""}`;
+
+  try {
+    const parts: any[] = [{ text: basePrompt }];
+    if (referenceImage) {
+      parts.unshift({ inlineData: { data: referenceImage.data, mimeType: referenceImage.mimeType } });
+    }
+
+    const response = await ai.models.generateContent({
+      model: "gemini-3-pro-image-preview",
+      contents: { parts },
+      config: {
+        imageConfig: { aspectRatio, imageSize: "1K" }
+      },
+    });
+
+    let text = "";
+    let image = null;
+
+    if (response.candidates?.[0]?.content?.parts) {
+      for (const part of response.candidates[0].content.parts) {
+        if (part.text) text += part.text;
+        if (part.inlineData) image = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
+      }
+    }
+    return { text, image };
+  } catch (e) {
+    console.error(e);
+    return { text: "Pro Generation failed. Ensure API Key is active.", image: null };
+  }
+};
+
 export const analyzeGatekeeperItem = async (
   base64Image: string, 
   currentWardrobe: WardrobeItem[],
   mimeType: string = "image/png"
 ): Promise<GatekeeperVerdict> => {
-  if (!apiKey) {
-    // Mock Response for Demo without Key
-    await new Promise(r => setTimeout(r, 2000));
-    return {
-      decision: 'REJECTED',
-      reason: "Duplicate Detected! You already own the 'Classic Blue Oxford' and 'Chambray Button Down' which serve the same aesthetic function.",
-      similarItemId: '5',
-      carbonImpact: 'High',
-      potentialOutfits: 0
-    };
-  }
-
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
   try {
     const wardrobeContext = JSON.stringify(currentWardrobe.map(item => ({
       id: item.id,
@@ -45,30 +115,10 @@ export const analyzeGatekeeperItem = async (
       tags: item.tags
     })));
 
-    const prompt = `
-      Act as "The Gatekeeper", a strict sustainable fashion AI.
-      
-      Task: Analyze this image of a POTENTIAL NEW PURCHASE and compare it against the user's CURRENT WARDROBE.
-      
-      CURRENT WARDROBE JSON:
-      ${wardrobeContext}
-
-      Rules:
-      1. If the user already owns something very similar (same color, category, and vibe), REJECT it. Sustainability is about reducing consumption.
-      2. If it is unique and fills a gap, APPROVE it.
-      
-      Output JSON format:
-      {
-        "decision": "APPROVED" | "REJECTED",
-        "reason": "Short punchy explanation.",
-        "similarItemId": "ID of the most similar item if REJECTED, else null",
-        "carbonImpact": "Low" | "Medium" | "High",
-        "potentialOutfits": Number (estimated new combos)
-      }
-    `;
+    const prompt = `Act as "The Gatekeeper", a strict sustainable fashion AI. Compare this new item to the wardrobe: ${wardrobeContext}. REJECT if similar. Output JSON.`;
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3-flash-preview",
       contents: {
         parts: [
           { inlineData: { mimeType, data: base64Image } },
@@ -85,55 +135,28 @@ export const analyzeGatekeeperItem = async (
             similarItemId: { type: Type.STRING },
             carbonImpact: { type: Type.STRING, enum: ["Low", "Medium", "High"] },
             potentialOutfits: { type: Type.INTEGER }
-          }
+          },
+          required: ["decision", "reason", "carbonImpact", "potentialOutfits"]
         }
       }
     });
 
-    if (response.text) {
-      return JSON.parse(response.text) as GatekeeperVerdict;
-    }
-    throw new Error("No verdict generated");
+    return JSON.parse(response.text || '{}');
   } catch (e) {
-    console.error("Gatekeeper Error:", e);
-    // Fallback
-    return {
-      decision: 'APPROVED',
-      reason: "Analysis error, but it looks stylish. Proceed with caution.",
-      carbonImpact: 'Medium',
-      potentialOutfits: 3
-    };
+    console.error(e);
+    return { decision: 'APPROVED', reason: "Unknown error.", carbonImpact: 'Medium', potentialOutfits: 0 };
   }
 };
 
 export const suggestOutfit = async (wardrobe: WardrobeItem[], context: string, inputImages?: { mimeType: string, data: string }[]): Promise<{text: string, image?: string}> => {
-  if (!apiKey) return { text: "Stylist unavailable (Missing API Key). Try pairing the Denim Jacket with the White Tee." };
-
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
   try {
     const wardrobeList = wardrobe.map(i => `- ${i.title} (${i.color} ${i.category})`).join('\n');
-    
-    const prompt = `You are VogueVault, a conscious stylist.
-    INVENTORY: ${wardrobeList}
-    CONTEXT: ${context}
-    
-    1. Generate a photorealistic image of the outfit.
-    2. Provide text advice:
-    *Vogue's Verdict:* [Summary]
-    **The Look:** [Name]
-    **Why it works:** [Theory]
-    `;
+    const prompt = `INVENTORY: ${wardrobeList}\nCONTEXT: ${context}\nStyle a complete look and generate a visual preview.`;
 
     const parts: any[] = [{ text: prompt }];
-
-    if (inputImages && inputImages.length > 0) {
-      inputImages.forEach(img => {
-        parts.push({
-          inlineData: {
-            mimeType: img.mimeType,
-            data: img.data
-          }
-        });
-      });
+    if (inputImages) {
+      inputImages.forEach(img => parts.push({ inlineData: { mimeType: img.mimeType, data: img.data } }));
     }
 
     const response = await ai.models.generateContent({
@@ -144,73 +167,38 @@ export const suggestOutfit = async (wardrobe: WardrobeItem[], context: string, i
 
     let text = "";
     let image = undefined;
-
-    if (response.candidates?.[0]?.content?.parts) {
-      for (const part of response.candidates[0].content.parts) {
-        if (part.text) text += part.text;
-        if (part.inlineData) image = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-      }
+    for (const part of response.candidates?.[0]?.content?.parts || []) {
+      if (part.text) text += part.text;
+      if (part.inlineData) image = `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
     }
-
     return { text: text || "Outfit generated.", image };
-
   } catch (e) {
-    console.error(e);
-    return { text: "Error contacting the digital stylist." };
+    return { text: "Error." };
   }
 };
 
-// -- HELPER FOR SHOP YOUR CLOSET (Look of the Day) --
 export const getLookOfTheDay = (wardrobe: WardrobeItem[], weatherCondition: string): WardrobeItem[] => {
-  // Simple heuristic logic instead of AI for speed in Dashboard
   const tops = wardrobe.filter(i => i.category === 'Tops');
   const bottoms = wardrobe.filter(i => i.category === 'Bottoms');
   const outerwear = wardrobe.filter(i => i.category === 'Outerwear');
-  
   const randomTop = tops[Math.floor(Math.random() * tops.length)];
   const randomBottom = bottoms[Math.floor(Math.random() * bottoms.length)];
-  
   const look = [randomTop, randomBottom];
-  
   if (weatherCondition.includes('Rain') || weatherCondition.includes('Cold')) {
     const jacket = outerwear[0];
     if (jacket) look.push(jacket);
   }
-  
   return look.filter(Boolean);
 };
 
-// -- ANALYZE CLOTHING ITEM --
 export const analyzeClothingItem = async (base64Image: string, mimeType: string = "image/png"): Promise<Partial<WardrobeItem>> => {
-  if (!apiKey) {
-    // Mock data for demo
-    await new Promise(r => setTimeout(r, 1000));
-    return {
-      title: "Scanned Garment",
-      category: "Tops",
-      color: "Black",
-      fabric: "Cotton",
-      tags: ["#Scanned", "#Sustainable"],
-      sustainability: {
-        rating: "B",
-        carbonFootprint: "5 kg CO2",
-        waterUsage: "500 L",
-        materialAnalysis: "Standard cotton production."
-      }
-    };
-  }
-
-  const prompt = `Analyze this clothing item for a wardrobe app.
-  Return JSON with: title, category (Tops, Bottoms, Shoes, Accessories, Outerwear), color, fabric, tags (array of strings), and sustainability metrics (rating A-F, carbonFootprint, waterUsage, materialAnalysis).`;
-
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
+  const prompt = `Analyze garment. Return JSON: title, category, color, fabric, tags, sustainability (rating A-F, carbonFootprint, waterUsage, materialAnalysis).`;
   try {
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-3-flash-preview",
       contents: {
-        parts: [
-          { inlineData: { mimeType, data: base64Image } },
-          { text: prompt }
-        ]
+        parts: [{ inlineData: { mimeType, data: base64Image } }, { text: prompt }],
       },
       config: {
         responseMimeType: "application/json",
@@ -235,43 +223,26 @@ export const analyzeClothingItem = async (base64Image: string, mimeType: string 
         }
       }
     });
-
-    if (response.text) {
-      return JSON.parse(response.text);
-    }
-    throw new Error("Analysis failed");
+    return JSON.parse(response.text || '{}');
   } catch (e) {
-    console.error("Analyze Item Error:", e);
-    return {
-      title: "New Item",
-      category: "Tops",
-      color: "Unknown",
-      fabric: "Unknown",
-      tags: []
-    };
+    return { title: "New Item" };
   }
 };
 
-// -- GENERATE SUSTAINABLE PROTOTYPE --
 export const generateSustainablePrototype = async (prompt: string): Promise<string | null> => {
-  if (!apiKey) return null;
-
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash-image",
       contents: {
-        parts: [{ text: `High fashion sustainable prototype: ${prompt}, photorealistic, studio lighting, clean background` }]
+        parts: [{ text: `High fashion sustainable prototype: ${prompt}, photorealistic, studio lighting` }]
       }
     });
-
     for (const part of response.candidates?.[0]?.content?.parts || []) {
-      if (part.inlineData) {
-        return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
-      }
+      if (part.inlineData) return `data:${part.inlineData.mimeType};base64,${part.inlineData.data}`;
     }
     return null;
   } catch (e) {
-    console.error("Generate Prototype Error:", e);
     return null;
   }
 };
